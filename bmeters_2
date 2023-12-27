@@ -1,0 +1,60 @@
+/*
+  Based on: https://github.com/wmbusmeters/wmbusmeters/blob/master/src/driver_hydrodigit.cc
+  Copyright (C) 2019-2022 Fredrik Öhrström (gpl-3.0-or-later)
+*/
+
+#pragma once
+
+#include "driver.h"
+
+#include <vector>
+#include <string>
+
+struct Bmeters: Driver
+{
+        if (t->tpl_cfg == 0x1006)
+        {
+            // This is the old type of meter and some values needs to be de-obfuscated.
+            vector<uchar> frame;
+            t->extractFrame(&frame);
+
+            debugPayload("(rftx1) decoding raw frame", frame);
+
+            uchar decoded_total[6];
+
+            for (int i = 0; i < 6; ++i)
+            {
+                decoded_total[i] = (uchar)(frame[0xf + i] ^ frame[0xb] ^ decode_vectors_[frame[0xb] & 0x0f][i]);
+            }
+
+            double total = 0;
+            double mul = 1;
+            for (int i = 2; i < 6; ++i)
+            {
+                total += mul*bcd2bin(decoded_total[i]);
+                mul *= 100;
+            }
+            setNumericValue("total", Unit::M3, total/1000.0);
+
+            int o = 28; // Offset to datetime.
+            int y = 2000+bcd2bin(frame[o+5]);
+            int M = bcd2bin(frame[o+4]);
+            int d = bcd2bin(frame[o+3]);
+            int H = bcd2bin(frame[o+2]);
+            int m = bcd2bin(frame[o+1]);
+            int s = bcd2bin(frame[o+0]);
+
+            string tmp;
+            strprintf(&tmp, "%d-%02d-%02d %02d:%02d:%02d",y, M%99, d%99, H%99, m%99, s%99);
+            setStringValue("meter_datetime", tmp);
+
+            return;
+        }
+    }
+  };
+
+private:
+};
+
+
+CI unknown wmbus CI unknown tpl-ci '78' tpl-cfg '5678' bmeters
